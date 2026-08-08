@@ -19,12 +19,12 @@ package controller
 import (
 	"context"
 
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-
-	observabilityv1alpha1 "github.com/jahnavigajjala-3/kubemedic/api/v1alpha1"
 )
 
 // HealthReportReconciler reconciles a HealthReport object
@@ -36,28 +36,62 @@ type HealthReportReconciler struct {
 // +kubebuilder:rbac:groups=observability.kubemedic.io,resources=healthreports,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=observability.kubemedic.io,resources=healthreports/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=observability.kubemedic.io,resources=healthreports/finalizers,verbs=update
+// +kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch
 
-// Reconcile is part of the main kubernetes reconciliation loop which aims to
-// move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the HealthReport object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
-//
-// For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.24.1/pkg/reconcile
-func (r *HealthReportReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = logf.FromContext(ctx)
+// Reconcile is part of the main Kubernetes reconciliation loop.
+func (r *HealthReportReconciler) Reconcile(
+	ctx context.Context,
+	req ctrl.Request,
+) (ctrl.Result, error) {
 
-	// TODO(user): your logic here
+	var pod corev1.Pod
+
+	// Get the Pod that triggered this reconciliation.
+	err := r.Get(ctx, req.NamespacedName, &pod)
+
+	if err != nil {
+		// The Pod may have been deleted between the event and
+		// our attempt to retrieve it. That is not an error.
+		if apierrors.IsNotFound(err) {
+			return ctrl.Result{}, nil
+		}
+
+		return ctrl.Result{}, err
+	}
+
+	// Basic information about the Pod.
+	log := logf.FromContext(ctx)
+
+	log.Info(
+		"Pod received",
+		"name", pod.Name,
+		"namespace", pod.Namespace,
+		"phase", pod.Status.Phase,
+		"containers", len(pod.Status.ContainerStatuses),
+	)
+
+	// Inspect every container in the Pod.
+	for _, container := range pod.Status.ContainerStatuses {
+		log.Info(
+			"Container status",
+			"container", container.Name,
+			"restartCount", container.RestartCount,
+			"ready", container.Ready,
+			"waiting", container.State.Waiting != nil,
+			"running", container.State.Running != nil,
+			"terminated", container.State.Terminated != nil,
+		)
+	}
 
 	return ctrl.Result{}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *HealthReportReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *HealthReportReconciler) SetupWithManager(
+	mgr ctrl.Manager,
+) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&observabilityv1alpha1.HealthReport{}).
+		For(&corev1.Pod{}).
 		Named("healthreport").
 		Complete(r)
 }
