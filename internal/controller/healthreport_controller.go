@@ -81,6 +81,17 @@ func (r *HealthReportReconciler) Reconcile(
 			"running", container.State.Running != nil,
 			"terminated", container.State.Terminated != nil,
 		)
+		diagnosis := diagnoseContainer(container)
+
+		if diagnosis != nil {
+			log.Info(
+				"Container problem detected",
+				"container", container.Name,
+				"reason", diagnosis.Reason,
+				"message", diagnosis.Message,
+				"recommendation", diagnosis.Recommendation,
+			)
+		}
 	}
 
 	return ctrl.Result{}, nil
