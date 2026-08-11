@@ -21,35 +21,30 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
-// HealthReportSpec defines the desired state of HealthReport
+// HealthReportSpec defines the desired state of HealthReport.
 type HealthReportSpec struct {
-
-	
+	PodName string `json:"podName,omitempty"`
 }
 
 // HealthReportStatus defines the observed state of HealthReport.
 type HealthReportStatus struct {
-	
-    Namespace string `json:"namespace,omitempty"`
-    PodName string `json:"podName,omitempty"`
-    Phase string `json:"phase,omitempty"`
-    Diagnosis string `json:"diagnosis,omitempty"`
-    Message string `json:"message,omitempty"`
-    RestartCount int32 `json:"restartCount,omitempty"`
-	LastUpdated metav1.Time `json:"lastUpdated,omitempty"`
-    Recommendation string `json:"recommendation,omitempty"`
-    Severity string `json:"severity,omitempty"`
-    Conditions []metav1.Condition `json:"conditions,omitempty"`
-
+	Namespace      string             `json:"namespace,omitempty"`
+	PodName        string             `json:"podName,omitempty"`
+	Phase          string             `json:"phase,omitempty"`
+	Diagnosis      string             `json:"diagnosis,omitempty"`
+	Message        string             `json:"message,omitempty"`
+	RestartCount   int32              `json:"restartCount,omitempty"`
+	LastUpdated    metav1.Time        `json:"lastUpdated,omitempty"`
+	Recommendation string             `json:"recommendation,omitempty"`
+	Severity       string             `json:"severity,omitempty"`
+	Conditions     []metav1.Condition `json:"conditions,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:resource:scope=Namespaced
 
-// HealthReport is the Schema for the healthreports API
+// HealthReport is the Schema for the healthreports API.
 type HealthReport struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -68,7 +63,7 @@ type HealthReport struct {
 
 // +kubebuilder:object:root=true
 
-// HealthReportList contains a list of HealthReport
+// HealthReportList contains a list of HealthReport.
 type HealthReportList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitzero"`
