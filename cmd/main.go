@@ -17,9 +17,13 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"crypto/tls"
+	"errors"
 	"flag"
+	"net/http"
 	"os"
+	"time"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -36,6 +40,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	observabilityv1alpha1 "github.com/jahnavigajjala-3/kubemedic/api/v1alpha1"
+	internalapi "github.com/jahnavigajjala-3/kubemedic/internal/api"
 	"github.com/jahnavigajjala-3/kubemedic/internal/controller"
 	// +kubebuilder:scaffold:imports
 )
@@ -61,6 +66,7 @@ func main() {
 	var probeAddr string
 	var secureMetrics bool
 	var enableHTTP2 bool
+	var apiAddr string
 	var tlsOpts []func(*tls.Config)
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
@@ -79,6 +85,7 @@ func main() {
 	flag.StringVar(&metricsCertKey, "metrics-cert-key", "tls.key", "The name of the metrics server key file.")
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
+	flag.StringVar(&apiAddr, "api-bind-address", ":8080", "The address the HealthReport HTTP API binds to.")
 	opts := zap.Options{
 		Development: true,
 	}
@@ -196,8 +203,27 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Start the HealthReport REST API in parallel with the controller manager.
+	ctx := ctrl.SetupSignalHandler()
+	apiServer := internalapi.NewServer(mgr.GetClient(), apiAddr)
+	go func() {
+		setupLog.Info("Starting HealthReport API server", "address", apiAddr)
+		if err := apiServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			setupLog.Error(err, "Failed to run API server")
+			os.Exit(1)
+		}
+	}()
+	go func() {
+		<-ctx.Done()
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := apiServer.Shutdown(shutdownCtx); err != nil {
+			setupLog.Error(err, "Failed to shut down API server cleanly")
+		}
+	}()
+
 	setupLog.Info("Starting manager")
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+	if err := mgr.Start(ctx); err != nil {
 		setupLog.Error(err, "Failed to run manager")
 		os.Exit(1)
 	}

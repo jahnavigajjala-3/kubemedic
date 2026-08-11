@@ -110,6 +110,50 @@ the '--force' flag and manually ensure that any custom configuration
 previously added to 'dist/chart/values.yaml' or 'dist/chart/manager/manager.yaml'
 is manually re-applied afterwards.
 
+## HealthReport REST API
+
+KubeMedic exposes a small HTTP API that reads `HealthReport` custom resources directly from Kubernetes.
+
+The API runs on port `:8080` by default and returns JSON responses for the future dashboard.
+
+### Endpoints
+
+- `GET /api/healthreports`
+  - returns all HealthReports as a JSON list
+- `GET /api/healthreports/{namespace}/{podName}`
+  - returns the matching HealthReport for the given namespace and Pod name
+  - returns `404` with a JSON error if the resource does not exist
+
+Example:
+
+```sh
+go run ./cmd/main.go --api-bind-address=:8080
+curl http://localhost:8080/api/healthreports
+curl http://localhost:8080/api/healthreports/default/nginx
+```
+
+### Example response
+
+```json
+{
+  "items": [
+    {
+      "namespace": "default",
+      "podName": "nginx",
+      "phase": "Running",
+      "diagnosis": "Healthy",
+      "severity": "Info",
+      "restartCount": 0,
+      "lastUpdated": "2026-08-11T00:00:00Z",
+      "recommendation": "No action required",
+      "conditions": []
+    }
+  ]
+}
+```
+
+The API does not store data itself; it reads Kubernetes `HealthReport` objects and serves them to clients.
+
 ## Contributing
 // TODO(user): Add detailed information on how you would like others to contribute to this project
 
