@@ -198,6 +198,17 @@ func TestHealthReportHandlerCors(t *testing.T) {
 	}
 }
 
+func TestHealthzEndpoint(t *testing.T) {
+	server := NewServer(nil, ":8080")
+	req := httptest.NewRequest(http.MethodGet, "/api/healthz", nil)
+	res := httptest.NewRecorder()
+	server.Handler().ServeHTTP(res, req)
+
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected 200 status for /api/healthz, got %d: %s", res.Code, res.Body.String())
+	}
+}
+
 type failingReader struct {
 	err error
 }
