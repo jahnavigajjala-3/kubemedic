@@ -55,9 +55,18 @@ func NewServer(c client.Reader, addr string) *Server {
 
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("/api/healthz", s.handleHealthz)
 	mux.HandleFunc("/api/healthreports", s.handleHealthReports)
 	mux.HandleFunc("/api/healthreports/", s.handleHealthReportByName)
 	return withCORS(mux)
+}
+
+func (s *Server) handleHealthz(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSON(w, http.StatusMethodNotAllowed, errorResponse{Error: "method not allowed"})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 func (s *Server) ListenAndServe() error {
@@ -79,7 +88,7 @@ func (s *Server) handleHealthReports(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusMethodNotAllowed, errorResponse{Error: "method not allowed"})
 		return
 	}
-	if r.URL.Path != "/api/healthreports" {
+	if r.URL.Path != "/api/healthreports" && r.URL.Path != "/api/healthreports/" {
 		writeJSON(w, http.StatusNotFound, errorResponse{Error: "HealthReport not found"})
 		return
 	}
