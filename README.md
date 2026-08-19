@@ -1,179 +1,200 @@
-# kubemedic
-// TODO(user): Add simple overview of use/purpose
+# KubeMedic 🏥⚡
 
-## Description
-// TODO(user): An in-depth paragraph about your project and overview of use
+**KubeMedic** is an automated Kubernetes operator and diagnostic tool designed to monitor pod health, detect failures in real time, generate actionable diagnostic reports, and visualize cluster status through an interactive Web Dashboard and REST API.
 
-## Getting Started
+---
+
+## 🌟 Key Features
+
+* **Automated Pod Diagnosis**: Continuously watches all Pods across cluster namespaces and diagnoses failure states like `OOMKilled`, `CrashLoopBackOff`, `ImagePullBackOff`, `ErrImagePull`, `HighRestartCount`, `Pending`, `Failed`, and `Unhealthy`.
+* **HealthReport Custom Resource (CRD)**: Automatically creates and reconciles `HealthReport` objects (`observability.kubemedic.io/v1alpha1`) linked via Kubernetes OwnerReferences for automatic garbage collection.
+* **Actionable Recommendations**: Provides human-readable diagnosis messages and specific remediation recommendations for quick troubleshooting.
+* **Built-in REST API**: High-performance HTTP API server running alongside the operator on port `:8080` (providing `/api/healthreports`, `/api/healthreports/{namespace}/{podName}`, and `/api/healthz`).
+* **Modern Web Dashboard**: A fast React + TypeScript + Vite frontend featuring real-time status updates, search & namespace filtering, severity cards (`Critical`, `High`, `Warning`, `Healthy`), and an interactive Pod Details drawer.
+* **Flexible Monitoring**: Supports local development, single-command bundle deployment, and remote cluster monitoring via kubeconfig.
+
+---
+
+## 🏗️ Architecture Overview
+
+```
+ ┌─────────────────────────────────────────────────────────┐
+ │                   Kubernetes Cluster                    │
+ │                                                         │
+ │  ┌──────────┐      Watches       ┌───────────────────┐  │
+ │  │   Pod    │ <───────────────── │ KubeMedic         │  │
+ │  └──────────┘                    │ Controller        │  │
+ │       │                          └─────────┬─────────┘  │
+ │       │ Reconciles                         │            │
+ │       ▼                                    ▼            │
+ │  ┌───────────────────────────────────────────────┐      │
+ │  │ HealthReport CRD (observability.kubemedic.io) │      │
+ │  └───────────────────────┬───────────────────────┘      │
+ └──────────────────────────┼──────────────────────────────┘
+                            │ Reads
+                            ▼
+              ┌───────────────────────────┐
+              │ KubeMedic REST API (:8080)│
+              └─────────────┬─────────────┘
+                            │ Serves JSON
+                            ▼
+              ┌───────────────────────────┐
+              │ Web Dashboard (React/Vite)│
+              └───────────────────────────┘
+```
+
+---
+
+## 🚀 Quickstart (Local Development)
 
 ### Prerequisites
-- go version v1.24.6+
-- docker version 17.03+.
-- kubectl version v1.11.3+.
-- Access to a Kubernetes v1.11.3+ cluster.
+* **Go**: v1.24+
+* **Node.js**: v18+
+* **kubectl**: v1.26+
+* **Docker / Kind** (optional for local cluster testing)
 
-### To Deploy on the cluster
-**Build and push your image to the location specified by `IMG`:**
-
-```sh
-make docker-build docker-push IMG=<some-registry>/kubemedic:tag
-```
-
-**NOTE:** This image ought to be published in the personal registry you specified.
-And it is required to have access to pull the image from the working environment.
-Make sure you have the proper permission to the registry if the above commands don’t work.
-
-**Install the CRDs into the cluster:**
-
-```sh
-make install
-```
-
-**Deploy the Manager to the cluster with the image specified by `IMG`:**
-
-```sh
-make deploy IMG=<some-registry>/kubemedic:tag
-```
-
-> **NOTE**: If you encounter RBAC errors, you may need to grant yourself cluster-admin
-privileges or be logged in as admin.
-
-**Create instances of your solution**
-You can apply the samples (examples) from the config/sample:
-
-```sh
-kubectl apply -k config/samples/
-```
-
->**NOTE**: Ensure that the samples has default values to test it out.
-
-### To Uninstall
-**Delete the instances (CRs) from the cluster:**
-
-```sh
-kubectl delete -k config/samples/
-```
-
-**Delete the APIs(CRDs) from the cluster:**
-
-```sh
-make uninstall
-```
-
-**UnDeploy the controller from the cluster:**
-
-```sh
-make undeploy
-```
-
-## Project Distribution
-
-Following the options to release and provide this solution to the users.
-
-### By providing a bundle with all YAML files
-
-1. Build the installer for the image built and published in the registry:
-
-```sh
-make build-installer IMG=<some-registry>/kubemedic:tag
-```
-
-**NOTE:** The makefile target mentioned above generates an 'install.yaml'
-file in the dist directory. This file contains all the resources built
-with Kustomize, which are necessary to install this project without its
-dependencies.
-
-2. Using the installer
-
-Users can just run 'kubectl apply -f <URL for YAML BUNDLE>' to install
-the project, i.e.:
-
-```sh
-kubectl apply -f https://raw.githubusercontent.com/<org>/kubemedic/<tag or branch>/dist/install.yaml
-```
-
-### By providing a Helm Chart
-
-1. Build the chart using the optional helm plugin
-
-```sh
-kubebuilder edit --plugins=helm/v2-alpha
-```
-
-2. See that a chart was generated under 'dist/chart', and users
-can obtain this solution from there.
-
-**NOTE:** If you change the project, you need to update the Helm Chart
-using the same command above to sync the latest changes. Furthermore,
-if you create webhooks, you need to use the above command with
-the '--force' flag and manually ensure that any custom configuration
-previously added to 'dist/chart/values.yaml' or 'dist/chart/manager/manager.yaml'
-is manually re-applied afterwards.
-
-## HealthReport REST API
-
-KubeMedic exposes a small HTTP API that reads `HealthReport` custom resources directly from Kubernetes.
-
-The API runs on port `:8080` by default and returns JSON responses for the future dashboard.
-
-### Endpoints
-
-- `GET /api/healthreports`
-  - returns all HealthReports as a JSON list
-- `GET /api/healthreports/{namespace}/{podName}`
-  - returns the matching HealthReport for the given namespace and Pod name
-  - returns `404` with a JSON error if the resource does not exist
-
-Example:
-
-```sh
+### Step 1: Run the Backend Operator & REST API
+```bash
+# Run the controller and REST API server locally against your active kubeconfig
 go run ./cmd/main.go --api-bind-address=:8080
+```
+
+### Step 2: Run the Web Dashboard
+In a separate terminal window:
+```bash
+cd frontend
+npm install
+npm run dev
+```
+Open **`http://localhost:5173`** in your browser to view the KubeMedic Dashboard.
+
+---
+
+## 📊 Viewing Health Reports
+
+You can inspect Pod health reports using three convenient methods:
+
+### 1. Using `kubectl` (Cluster CRDs)
+```bash
+# List all HealthReports across all namespaces
+kubectl get healthreports -A
+
+# Short form
+kubectl get hr -n default
+
+# Get detailed diagnostic details for a specific pod
+kubectl get healthreport <pod-name> -n <namespace> -o yaml
+```
+
+### 2. Using the REST API
+```bash
+# Get all health reports
 curl http://localhost:8080/api/healthreports
+
+# Get health report for a specific pod
 curl http://localhost:8080/api/healthreports/default/nginx
+
+# API Health Check
+curl http://localhost:8080/api/healthz
 ```
 
-### Example response
+### 3. Using the Web Dashboard
+Visit `http://localhost:5173` to interactively filter, search, and view detailed recommendations for any pod in your cluster.
 
-```json
-{
-  "items": [
-    {
-      "namespace": "default",
-      "podName": "nginx",
-      "phase": "Running",
-      "diagnosis": "Healthy",
-      "severity": "Info",
-      "restartCount": 0,
-      "lastUpdated": "2026-08-11T00:00:00Z",
-      "recommendation": "No action required",
-      "conditions": []
-    }
-  ]
-}
+---
+
+## 📦 Deployment to a Remote Cluster
+
+### Option 1: Standard Kubebuilder / Kustomize Deployment
+
+1. **Set your remote cluster context**:
+   ```bash
+   export KUBECONFIG=/path/to/remote-cluster.kubeconfig
+   ```
+
+2. **Build and push the container image**:
+   ```bash
+   export IMG=your-dockerhub-username/kubemedic:v1.0.0
+   make docker-build docker-push IMG=$IMG
+   ```
+
+3. **Install CRDs and Deploy the Manager**:
+   ```bash
+   make install
+   make deploy IMG=$IMG
+   ```
+
+4. **Verify the Deployment**:
+   ```bash
+   kubectl get pods -n kubemedic-system
+   ```
+
+---
+
+### Option 2: Single-File YAML Bundle
+
+Generate a single `dist/install.yaml` manifest that contains all CRDs, RBAC roles, and Deployment configs:
+
+```bash
+# 1. Build the installer manifest
+export IMG=your-dockerhub-username/kubemedic:v1.0.0
+make build-installer IMG=$IMG
+
+# 2. Apply to any cluster
+kubectl apply -f dist/install.yaml
 ```
 
-The API does not store data itself; it reads Kubernetes `HealthReport` objects and serves them to clients.
+---
 
-## Contributing
-// TODO(user): Add detailed information on how you would like others to contribute to this project
+## 🌐 Monitoring Another Cluster
 
-**NOTE:** Run `make help` for more information on all potential `make` targets
+To monitor a different cluster from your local machine:
+```bash
+# Set KUBECONFIG to the target cluster
+export KUBECONFIG=/path/to/target-cluster.kubeconfig
 
-More information can be found via the [Kubebuilder Documentation](https://book.kubebuilder.io/introduction.html)
+# Install CRDs on target cluster
+make install
 
-## License
+# Run KubeMedic
+go run ./cmd/main.go --api-bind-address=:8080
+```
 
-Copyright 2026.
+---
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+## 🧪 Testing & Quality Assurance
 
-    http://www.apache.org/licenses/LICENSE-2.0
+```bash
+# Run unit tests (uses envtest: real K8s API + etcd)
+make test
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+# Run code linters
+make lint
 
+# Run e2e tests (requires Kind)
+make test-e2e
+```
+
+---
+
+## 📁 Repository Structure
+
+```
+├── api/v1alpha1/           # HealthReport CRD API schema definitions
+├── cmd/main.go              # Manager entrypoint (Registers controllers & REST API)
+├── config/                  # Kustomize deployment manifests & CRDs
+├── frontend/                # React + TypeScript + Vite Dashboard
+│   ├── src/components/      # UI components (Header, Table, PodDetails, Filters)
+│   ├── src/services/        # API service and response normalization
+│   └── src/types/           # TypeScript interfaces
+├── internal/api/            # REST API server & HTTP handlers
+├── internal/controller/     # HealthReport reconciler and pod diagnosis logic
+├── Makefile                 # Build, test, and deployment automation
+└── README.md                # Project documentation
+```
+
+---
+
+## 📄 License
+
+Copyright 2026. Licensed under the Apache License, Version 2.0.
